@@ -392,11 +392,18 @@ function PaymentModal({
   // OTP step: once set, the gateway texted a code we collect on our own screen.
   const [otpRef, setOtpRef] = useState<string | null>(null);
   // Which gateway the pending OTP belongs to — decides where submitOtp posts.
-  const [otpGateway, setOtpGateway] = useState<"moolre" | "flutterwave">("moolre");
+  const [otpGateway, setOtpGateway] = useState<"moolre" | "flutterwave" | "payseed">("moolre");
   const [otp, setOtp] = useState("");
   // When a gateway needs the customer on its own secure page, we show a clear
   // hand-off screen (with this URL) instead of silently redirecting them.
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
+  // Nigeria PaySeed bank transfer — the virtual account to display + poll on.
+  const [bankAccount, setBankAccount] = useState<{
+    bank_name?: string;
+    account_number?: string;
+    account_name?: string;
+    expires_at?: string;
+  } | null>(null);
   const [diag, setDiag] = useState(""); // temp: shows Moolre's raw reply on screen
   // Manual deposit: customer pays our MoMo number and uploads the screenshot.
   const [file, setFile] = useState<File | null>(null);
@@ -418,6 +425,15 @@ function PaymentModal({
   // Paystack mobile-money checkout. NETWORK ids (mtn/vod/atl) are
   // Paystack's GH provider codes, sent as `provider` to the start endpoint.
   const usePaystackMomo = getCountryForCurrency(cc).gateway === "paystack";
+  // PaySeed — the gateway for GH + NG. Ghana uses our own in-app MoMo checkout
+  // (charge + phone prompt / OTP, no hosted page, same UX as the Flutterwave
+  // MoMo flow); Nigeria uses a bank-transfer virtual account.
+  const usePayseed = getCountryForCurrency(cc).gateway === "payseed";
+  const usePayseedMomo = usePayseed && cc === "GHS";
+  const usePayseedBank = usePayseed && cc !== "GHS";
+  // In-app MoMo UI (network picker + phone) is shared by the Flutterwave and
+  // PaySeed Ghana flows.
+  const useMomoForm = useFlutterwaveMomo || usePayseedMomo;
   // Hosted redirect checkouts (Moolre, Korapay, Flutterwave-NG) skip the
   // agent-account + screenshot UI: the player pays on the gateway page and we
   // credit on return.
@@ -473,12 +489,116 @@ function PaymentModal({
 
   // Route the deposit to the right flow for the user's country.
   async function deposit() {
+    if (usePayseedMomo) return depositPayseedMomo();
+    if (usePayseedBank) return depositPayseedBank();
     if (useMoolre) return depositMoolre();
     if (useFlutterwaveMomo) return depositFlutterwaveMomo();
     if (useFlutterwaveHosted) return depositFlutterwave();
     if (useKorapay) return depositKorapay();
     if (usePaystackMomo) return depositPaystackMomo();
     return depositManual();
+  }
+
+  // PaySeed poll — re-verifies by PaySeed id and credits on success.
+  async function pollPayseed(reference: string) {
+    const TERMINAL_FAIL = [
+      "failed", "reversed", "amount-mismatch", "currency-mismatch", "verify-failed",
+      "no-user", "credit-failed", "unknown-reference", "missing-payseed-id",
+    ];
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/payments/payseed/status?reference=${encodeURIComponent(reference)}`);
+        const data = await res.json();
+        const s = data.status as string;
+        if (s === "success" || s === "already-credited") { setDone(true); onSuccess(); return; }
+        if (TERMINAL_FAIL.includes(s)) { setError("Payment was not completed. Please try again."); return; }
+        setStatus("Waiting for your approval — " + approvalHint);
+      } catch {
+        /* transient — keep polling */
+      }
+    }
+    setError("Still waiting for confirmation. If you approved the payment, your balance will update once it settles — refresh in a minute.");
+  }
+
+  // Ghana MoMo via PaySeed — charge on our own screen, OTP if the network needs
+  // it, then poll while the player approves the phone prompt.
+  async function depositPayseedMomo() {
+    if (!phone.trim()) {
+      setError("Enter your mobile money number.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    setStatus("Starting mobile money deposit…");
+    try {
+      const res = await fetch("/api/payments/payseed/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, amount: amt, phone: phone.trim(), network, returnPath: "/account" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reference) {
+        console.error("[deposit] payseed momo start failed:", data.error);
+        setError("We couldn't start your Mobile Money deposit right now. Please try again in a moment.");
+        return;
+      }
+      if (data.otpRequired) {
+        setOtpGateway("payseed");
+        setOtpRef(data.reference as string);
+        setStatus("");
+        return;
+      }
+      if (data.redirect) {
+        setRedirectUrl(data.redirect as string);
+        setStatus("");
+        return;
+      }
+      setStatus("Approve the prompt on your phone to complete your deposit.");
+      await pollPayseed(data.reference);
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Nigeria via PaySeed — create a bank-transfer virtual account, show the
+  // details to the customer, then poll until PaySeed confirms the transfer.
+  async function depositPayseedBank() {
+    setError(null);
+    setBusy(true);
+    setStatus("Setting up your bank transfer…");
+    try {
+      const res = await fetch("/api/payments/payseed/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, amount: amt, returnPath: "/account" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reference) {
+        console.error("[deposit] payseed bank start failed:", data.error);
+        setError("We couldn't start your deposit right now. Please try again in a moment.");
+        return;
+      }
+      if (data.redirect) {
+        setRedirectUrl(data.redirect as string);
+        setStatus("");
+        return;
+      }
+      if (data.account) {
+        setBankAccount(data.account);
+        setStatus("");
+        await pollPayseed(data.reference);
+        return;
+      }
+      setStatus("Complete the transfer to fund your account.");
+      await pollPayseed(data.reference);
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   // Custom Ghana MoMo checkout: charge Flutterwave directly and poll while the
@@ -710,25 +830,26 @@ function PaymentModal({
   // that issued the code (Flutterwave validate-charge, or Moolre direct).
   async function submitOtp() {
     if (!otpRef || !otp.trim()) return;
-    const isFlutterwave = otpGateway === "flutterwave";
+    const otpEndpoint =
+      otpGateway === "flutterwave"
+        ? "/api/payments/flutterwave/momo/otp"
+        : otpGateway === "payseed"
+          ? "/api/payments/payseed/otp"
+          : "/api/payments/moolre/direct/otp";
+    // Moolre expects `otpcode`; Flutterwave and PaySeed expect `otp`.
+    const otpBody =
+      otpGateway === "moolre"
+        ? { reference: otpRef, otpcode: otp.trim() }
+        : { reference: otpRef, otp: otp.trim() };
     setError(null);
     setBusy(true);
     setStatus("Verifying code…");
     try {
-      const res = await fetch(
-        isFlutterwave
-          ? "/api/payments/flutterwave/momo/otp"
-          : "/api/payments/moolre/direct/otp",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(
-            isFlutterwave
-              ? { reference: otpRef, otp: otp.trim() }
-              : { reference: otpRef, otpcode: otp.trim() },
-          ),
-        },
-      );
+      const res = await fetch(otpEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(otpBody),
+      });
       const data = await res.json();
       setDiag(data.moolre ? `Moolre: ${data.moolre.code ?? "?"} — ${data.moolre.message ?? ""}` : `status=${data.status}`);
       if (data.status === "already-credited" || data.status === "success") {
@@ -745,7 +866,11 @@ function PaymentModal({
         return;
       }
       setStatus(approvalHint);
-      await (isFlutterwave ? pollFlutterwaveMomo(otpRef) : pollDeposit(otpRef));
+      await (otpGateway === "flutterwave"
+        ? pollFlutterwaveMomo(otpRef)
+        : otpGateway === "payseed"
+          ? pollPayseed(otpRef)
+          : pollDeposit(otpRef));
     } catch {
       setError("Network error — please try again.");
     } finally {
@@ -794,6 +919,42 @@ function PaymentModal({
               {type === "deposit" ? "We've received your payment proof. Your balance is credited once we confirm it — usually within minutes." : "Funds arrive after the operator processes your request."}
             </p>
             <button onClick={onClose} className="mt-6 w-full rounded-xl py-3 font-display font-bold grad-violet-pink text-white text-sm">Done</button>
+          </div>
+        ) : bankAccount ? (
+          <div className="p-5 space-y-4">
+            <p className="text-[13px] text-[var(--color-ink-dim)]">
+              Transfer exactly <span className="font-semibold text-white">{amt > 0 ? money(amt) : ""}</span> to the account below.
+              Your balance updates automatically once the transfer is received.
+            </p>
+            <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] divide-y divide-[var(--color-line)]">
+              {[
+                { label: "Bank", value: bankAccount.bank_name ?? "—" },
+                { label: "Account number", value: bankAccount.account_number ?? "—", copy: true },
+                { label: "Account name", value: bankAccount.account_name ?? "—" },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between px-3.5 py-3">
+                  <span className="text-[11px] font-mono uppercase tracking-wide text-[var(--color-ink-faint)]">{row.label}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="num text-[14px] font-bold text-white">{row.value}</span>
+                    {row.copy && row.value !== "—" && (
+                      <button onClick={() => copyNumber(row.value)} className="text-[var(--color-cyan)] hover:underline text-[11px]">
+                        {copiedNum === row.value ? "Copied" : "Copy"}
+                      </button>
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {status && !error && (
+              <p className="text-[12.5px] text-[var(--color-cyan)] flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> {status || "Waiting for your transfer…"}</p>
+            )}
+            {error && <p className="text-[12.5px] font-semibold text-[var(--color-rose,#fb7185)]">{error}</p>}
+            <button
+              onClick={() => { setBankAccount(null); setError(null); setStatus(""); }}
+              className="w-full rounded-xl py-2.5 font-display font-semibold text-[var(--color-ink-dim)] hover:text-white text-[13px]"
+            >
+              ← Start over
+            </button>
           </div>
         ) : redirectUrl ? (
           <div className="p-6 flex flex-col items-center text-center">
@@ -881,7 +1042,7 @@ function PaymentModal({
         ) : (
           <div className="p-5 space-y-4">
             {type === "deposit" ? (
-              useFlutterwaveMomo ? (
+              useMomoForm ? (
               <>
               <div>
                 <label className="text-[11px] font-mono uppercase tracking-wide text-[var(--color-ink-faint)]">Choose network</label>
@@ -932,6 +1093,13 @@ function PaymentModal({
                   {useKorapay
                     ? "Continue to the secure checkout to pay with mobile money, card or bank transfer — your balance updates automatically once paid."
                     : "Continue to the secure page to pay with MTN MoMo, Telecel Cash or AirtelTigo Money — your balance updates automatically once paid."}
+                </p>
+              </div>
+              ) : usePayseedBank ? (
+              <div className="rounded-xl border border-[var(--color-violet)]/30 bg-[var(--color-surface-2)] px-3.5 py-3.5">
+                <p className="text-[12px] text-[var(--color-ink-dim)] leading-snug">
+                  Tap Deposit to get a one-time bank account. Transfer your amount to it and your
+                  balance updates automatically once the payment is received.
                 </p>
               </div>
               ) : (
@@ -1070,14 +1238,14 @@ function PaymentModal({
 
             <button
               onClick={type === "deposit" ? deposit : withdraw}
-              disabled={busy || !(amt > 0) || belowMin || (type === "deposit" && !useHostedCheckout && !useFlutterwaveMomo && !file) || (type === "deposit" && useFlutterwaveMomo && !phone.trim()) || (type === "withdraw" && !phone.trim())}
+              disabled={busy || !(amt > 0) || belowMin || (type === "deposit" && !useHostedCheckout && !useMomoForm && !usePayseedBank && !file) || (type === "deposit" && useMomoForm && !phone.trim()) || (type === "withdraw" && !phone.trim())}
               className="w-full rounded-xl py-3.5 font-display font-extrabold text-[14px] grad-violet-pink text-white disabled:opacity-50 active:scale-[.99] transition capitalize flex items-center justify-center gap-2"
             >
               {busy && <Loader2 size={16} className="animate-spin" />}
               {type === "deposit"
                 ? busy
-                  ? (useHostedCheckout ? "Redirecting…" : useFlutterwaveMomo ? "Processing…" : "Submitting…")
-                  : `${useHostedCheckout || useFlutterwaveMomo ? "Deposit" : "Submit deposit"} ${amt > 0 ? money(amt) : ""}`
+                  ? (useHostedCheckout ? "Redirecting…" : (useMomoForm || usePayseedBank) ? "Processing…" : "Submitting…")
+                  : `${useHostedCheckout || useMomoForm || usePayseedBank ? "Deposit" : "Submit deposit"} ${amt > 0 ? money(amt) : ""}`
                 : `Withdraw ${amt > 0 ? money(amt) : ""}`}
             </button>
 

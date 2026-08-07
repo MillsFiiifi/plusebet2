@@ -69,7 +69,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     minFirstDeposit: 200,
     verificationAmount: 200,
     withdrawQualifyTotal: 848,
-    gateway: 'payseed',
+    gateway: 'flutterwave',
     payoutTarget: 'mobile',
     // Keys match the withdraw form's network ids (mtn/vod/atl) so all three
     // validate, not just MTN.
@@ -96,7 +96,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     // Cumulative deposits a player must reach before withdrawals unlock —
     // the NGN equivalent of Ghana's 848 GHS qualifying total.
     withdrawQualifyTotal: 83571.79,
-    gateway: 'payseed',
+    gateway: 'flutterwave',
     // Nigeria withdraws via mobile money, same flow as Ghana (network + phone),
     // rather than the bank-account path.
     payoutTarget: 'mobile',

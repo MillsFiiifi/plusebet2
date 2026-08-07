@@ -140,7 +140,7 @@ export interface Commission {
   createdAt: string
 }
 
-export const COMMISSION_RATE = 0.7 // 70% of every deposit from a referred user
+export const COMMISSION_RATE = 0.6 // 60% of every deposit from a referred user
 
 export interface SubAdmin {
   id: string

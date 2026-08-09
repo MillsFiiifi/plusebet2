@@ -244,6 +244,20 @@ export async function settleBetIfPending(
   return rowToBet(data as BetRow, selectionsByBet.get(data.id) ?? [])
 }
 
+/**
+ * Put a settled bet back to pending — used when the wallet credit fails right
+ * after we flipped it to 'won', so a later settle run retries the whole thing
+ * instead of leaving it won-but-unpaid. No-op guard: only reverts a 'won' row.
+ */
+export async function revertBetToPending(id: string): Promise<void> {
+  const { error } = await supabaseServer()
+    .from('bets')
+    .update({ status: 'pending', settled_at: null, payout: null })
+    .eq('id', id)
+    .eq('status', 'won')
+  if (error) throw new Error(`bets.revertToPending: ${error.message}`)
+}
+
 /** Set a single selection's result (per-leg colours on the bet card). */
 export async function setSelectionStatusById(
   selectionId: string,

@@ -15,6 +15,7 @@ import {
   readBetsForUser,
   settleBetIfPending,
   setSelectionStatusById,
+  revertBetToPending,
 } from '@/lib/bets-store'
 import { creditBalance } from '@/lib/users-store'
 import { readCustomMatches } from '@/lib/custom-matches-store'
@@ -98,8 +99,23 @@ export async function settlePendingBets(userId?: string): Promise<SettleResult> 
       const payout = bet.payout ?? bet.potentialWin
       const settled = await settleBetIfPending(bet.id, { status: 'won', settledAt, payout })
       if (!settled) continue // another path already settled it
+
+      // Credit the wallet BEFORE we consider the win final. If the credit
+      // fails, revert the bet to pending so the next run retries the whole
+      // thing — never leave a bet 'won' but unpaid (that was the old bug: the
+      // credit error was swallowed and the win could never be re-credited).
+      try {
+        if (bet.userId) {
+          const credited = await creditBalance(bet.userId, payout)
+          if (!credited) throw new Error(`creditBalance returned null for user ${bet.userId}`)
+        }
+      } catch (e) {
+        console.error('[settle] credit failed — reverting bet to pending:', bet.id, e)
+        await revertBetToPending(bet.id).catch(() => {})
+        continue
+      }
+
       for (const l of legResults) await setSelectionStatusById(l.leg.id, 'won').catch(() => {})
-      if (bet.userId) await creditBalance(bet.userId, payout).catch(() => null)
       result.won++
       result.creditedTotal += payout
     } else {

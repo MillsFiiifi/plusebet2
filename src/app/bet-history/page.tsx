@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { BetCard } from "@/components/bet-card";
 import { useBets } from "@/lib/use-bets";
+import { useMatches } from "@/lib/use-matches";
 import { cedis } from "@/lib/utils";
 
 const TABS = ["All", "Won", "Lost", "Pending"];
@@ -13,6 +14,9 @@ const MAP: Record<string, string> = { Won: "won", Lost: "lost", Pending: "pendin
 export default function BetHistoryPage() {
   const [tab, setTab] = useState("All");
   const { bets, loading, loggedIn } = useBets();
+  // In-play games — a pending bet on one of these shows "Playing".
+  const { live } = useMatches();
+  const liveMatchIds = new Set(live.map((m) => m.id));
   const list = tab === "All" ? bets : bets.filter((b) => b.status === MAP[tab]);
   const won = bets.filter((b) => b.status === "won").length;
 
@@ -53,7 +57,7 @@ export default function BetHistoryPage() {
 
           <div className="space-y-3">
             {list.map((b) => (
-              <BetCard key={b.id} b={b} />
+              <BetCard key={b.id} b={b} liveMatchIds={liveMatchIds} />
             ))}
             {list.length === 0 && (
               <div className="card py-12 text-center text-[13px] text-[var(--color-ink-faint)]">No bets in this category.</div>

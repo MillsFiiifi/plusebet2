@@ -5,9 +5,13 @@ import { Ticket } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { BetCard } from "@/components/bet-card";
 import { useBets } from "@/lib/use-bets";
+import { useMatches } from "@/lib/use-matches";
 
 export default function MyBetsPage() {
   const { bets, loading, loggedIn } = useBets();
+  // Games in-play right now — a pending bet on one of these shows "Playing".
+  const { live } = useMatches();
+  const liveMatchIds = new Set(live.map((m) => m.id));
   const open = bets.filter((b) => b.status === "pending" || b.status === "cashout");
   const settled = bets.filter((b) => b.status === "won" || b.status === "lost");
 
@@ -32,7 +36,7 @@ export default function MyBetsPage() {
           {open.length > 0 ? (
             <div className="space-y-3">
               {open.map((b) => (
-                <BetCard key={b.id} b={b} />
+                <BetCard key={b.id} b={b} liveMatchIds={liveMatchIds} />
               ))}
             </div>
           ) : (
@@ -54,7 +58,7 @@ export default function MyBetsPage() {
               </div>
               <div className="space-y-3">
                 {settled.map((b) => (
-                  <BetCard key={b.id} b={b} />
+                  <BetCard key={b.id} b={b} liveMatchIds={liveMatchIds} />
                 ))}
               </div>
             </>

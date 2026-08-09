@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Check, X, Clock, Banknote, Copy, Trophy } from "lucide-react";
+import { ChevronDown, Check, X, Clock, Banknote, Copy, Trophy, Radio } from "lucide-react";
 import type { Bet } from "@/lib/types";
 import { WinCongrats } from "./win-congrats";
 import { cn, cedis } from "@/lib/utils";
@@ -9,6 +9,8 @@ import { cn, cedis } from "@/lib/utils";
 const STATUS = {
   won: { label: "Won", cls: "bg-[var(--color-emerald)]/12 text-[var(--color-emerald)] border-[var(--color-emerald)]/30", icon: Check },
   lost: { label: "Lost", cls: "bg-[var(--color-rose)]/12 text-[var(--color-rose)] border-[var(--color-rose)]/30", icon: X },
+  // "Playing" = still pending, but at least one of the bet's games is in-play.
+  playing: { label: "Playing", cls: "bg-[var(--color-cyan)]/12 text-[var(--color-cyan)] border-[var(--color-cyan)]/30", icon: Radio },
   pending: { label: "Pending", cls: "bg-[var(--color-amber)]/12 text-[var(--color-amber)] border-[var(--color-amber)]/30", icon: Clock },
   cashout: { label: "Cash Out", cls: "bg-[var(--color-cyan)]/12 text-[var(--color-cyan)] border-[var(--color-cyan)]/30", icon: Banknote },
 } as const;
@@ -16,13 +18,19 @@ const STATUS = {
 const LEG = {
   won: "text-[var(--color-emerald)]",
   lost: "text-[var(--color-rose)]",
+  playing: "text-[var(--color-cyan)]",
   pending: "text-[var(--color-amber)]",
 } as const;
 
-export function BetCard({ b }: { b: Bet }) {
+export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string> }) {
   const [open, setOpen] = useState(false);
   const [celebrate, setCelebrate] = useState(false);
-  const s = STATUS[b.status];
+  // Is any leg's game in-play right now? Only meaningful while the bet is pending.
+  const legLive = (matchId?: string) => !!matchId && !!liveMatchIds?.has(matchId);
+  const anyLive = b.status === "pending" && b.legs.some((l) => legLive(l.matchId));
+  // Show "Playing" instead of "Pending" once a game kicks off.
+  const displayStatus = anyLive ? "playing" : b.status;
+  const s = STATUS[displayStatus];
   const Icon = s.icon;
   const isWon = b.status === "won";
 
@@ -72,17 +80,21 @@ export function BetCard({ b }: { b: Bet }) {
 
       {open && (
         <div className="border-t border-[var(--color-line)] px-4 py-3 space-y-2.5 bg-[var(--color-bg-2)]/50 animate-rise">
-          {b.legs.map((l, i) => (
-            <div key={i} className="flex items-center gap-3">
-              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", l.result === "won" ? "bg-[var(--color-emerald)]" : l.result === "lost" ? "bg-[var(--color-rose)]" : "bg-[var(--color-amber)]")} />
-              <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] font-medium truncate">{l.pick}</div>
-                <div className="text-[10.5px] text-[var(--color-ink-faint)] truncate">{l.match}</div>
+          {b.legs.map((l, i) => {
+            // A still-undecided leg whose game is in-play shows "Playing".
+            const legResult = l.result === "pending" && legLive(l.matchId) ? "playing" : l.result;
+            return (
+              <div key={i} className="flex items-center gap-3">
+                <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", legResult === "won" ? "bg-[var(--color-emerald)]" : legResult === "lost" ? "bg-[var(--color-rose)]" : legResult === "playing" ? "bg-[var(--color-cyan)] animate-pulse" : "bg-[var(--color-amber)]")} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12.5px] font-medium truncate">{l.pick}</div>
+                  <div className="text-[10.5px] text-[var(--color-ink-faint)] truncate">{l.match}</div>
+                </div>
+                <span className="num text-[12px] font-bold shrink-0">{l.odds.toFixed(2)}</span>
+                <span className={cn("text-[10px] font-bold uppercase w-12 text-right shrink-0", LEG[legResult])}>{legResult}</span>
               </div>
-              <span className="num text-[12px] font-bold shrink-0">{l.odds.toFixed(2)}</span>
-              <span className={cn("text-[10px] font-bold uppercase w-12 text-right shrink-0", LEG[l.result])}>{l.result}</span>
-            </div>
-          ))}
+            );
+          })}
           <div className="flex items-center justify-between pt-2.5 border-t border-[var(--color-line)] text-[12px]">
             <span className="text-[var(--color-ink-dim)]">Stake</span>
             <span className="num font-bold">{cedis(b.stake)}</span>

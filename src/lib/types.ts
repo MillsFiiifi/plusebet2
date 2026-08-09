@@ -60,7 +60,7 @@ export type Txn = {
 export type Bet = {
   id: string;
   type: "single" | "multi";
-  legs: { match: string; pick: string; odds: number; result: "won" | "lost" | "pending" }[];
+  legs: { matchId?: string; match: string; pick: string; odds: number; result: "won" | "lost" | "pending" }[];
   stake: number;
   totalOdds: number;
   potential: number;

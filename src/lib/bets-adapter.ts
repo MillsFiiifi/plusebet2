@@ -36,6 +36,7 @@ function verifyCodeFor(id: string, code: string): string {
 
 export function placedBetToUi(b: PlacedBet): Bet {
   const legs = (b.selections ?? []).map((s) => ({
+    matchId: s.matchId ?? '',
     match: matchLabel(s),
     pick: s.outcomeLabel ?? s.marketLabel ?? '—',
     odds: Number(s.odds) || 0,

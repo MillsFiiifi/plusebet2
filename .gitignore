@@ -46,3 +46,5 @@ next-env.d.ts
 # project reference (scraped original site)
 /_reference
 /site_full.html
+
+.vercel

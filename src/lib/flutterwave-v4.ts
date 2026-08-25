@@ -114,6 +114,19 @@ function ghanaLocalNumber(phone: string): string {
   return d
 }
 
+/**
+ * V4 rejects a customer whose email already exists ("CUSTOMER_ALREADY_EXISTS"),
+ * and there's no reliable lookup, so we make the email unique PER CHARGE via
+ * plus-addressing (routes to the same real inbox, never collides). Falls back
+ * to a synthetic address if the email has no domain.
+ */
+function uniqueCustomerEmail(email: string, reference: string): string {
+  const tag = reference.replace(/[^A-Za-z0-9]/g, '').slice(0, 40)
+  const at = (email || '').indexOf('@')
+  if (at > 0) return `${email.slice(0, at)}+${tag}@${email.slice(at + 1)}`
+  return `momo-${tag}@pluse.app`
+}
+
 export interface V4Charge {
   id: string
   status: string // 'pending' | 'succeeded' | 'failed' | …
@@ -144,7 +157,8 @@ export async function chargeGhanaMomoV4(input: {
     body: {
       name: { first: input.firstName || 'Customer', last: input.lastName || '' },
       phone: { country_code: '233', number },
-      email: input.email,
+      // Unique per charge so V4 never rejects a returning depositor.
+      email: uniqueCustomerEmail(input.email, input.reference),
     },
   })
 

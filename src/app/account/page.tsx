@@ -492,7 +492,7 @@ function PaymentModal({
     if (usePayseedMomo) return depositPayseedMomo();
     if (usePayseedBank) return depositPayseedBank();
     if (useMoolre) return depositMoolre();
-    if (useFlutterwaveMomo) return depositFlutterwaveMomo();
+    if (useFlutterwaveMomo) return depositFlutterwaveV4Momo();
     if (useFlutterwaveHosted) return depositFlutterwave();
     if (useKorapay) return depositKorapay();
     if (usePaystackMomo) return depositPaystackMomo();
@@ -623,6 +623,58 @@ function PaymentModal({
       }
     }
     setError("Still waiting for confirmation. If you approved the payment, your balance will update once it settles — refresh in a minute.");
+  }
+
+  // Flutterwave V4 Ghana MoMo — the current flow. V4 authorises with a PIN
+  // PROMPT on the customer's phone (no OTP, no WhatsApp code); we just poll.
+  async function pollFlutterwaveV4Momo(reference: string) {
+    const TERMINAL_FAIL = [
+      "failed", "amount-mismatch", "currency-mismatch", "verify-failed",
+      "no-user", "credit-failed", "unknown-reference", "no-charge-id",
+    ];
+    for (let i = 0; i < 80; i++) {
+      await new Promise((r) => setTimeout(r, 3000));
+      try {
+        const res = await fetch(`/api/payments/flutterwave-v4/momo/status?reference=${encodeURIComponent(reference)}`);
+        const data = await res.json();
+        const s = data.status as string;
+        if (s === "success" || s === "already-credited") { setDone(true); onSuccess(); return; }
+        if (TERMINAL_FAIL.includes(s)) { setError("Payment was not completed. Please try again."); return; }
+        setStatus("Waiting for your approval — enter your Mobile Money PIN on your phone.");
+      } catch {
+        /* transient — keep polling */
+      }
+    }
+    setError("Still waiting for confirmation. If you approved the payment, your balance will update once it settles — refresh in a minute.");
+  }
+
+  async function depositFlutterwaveV4Momo() {
+    if (!phone.trim()) {
+      setError("Enter your mobile money number.");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    setStatus("Starting mobile money deposit…");
+    try {
+      const res = await fetch("/api/payments/flutterwave-v4/momo/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, amount: amt, phone: phone.trim(), network }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.reference) {
+        console.error("[deposit] flutterwave v4 momo start failed:", data.error);
+        setError(data.error ?? "We couldn't start your Mobile Money deposit right now. Please try again in a moment.");
+        return;
+      }
+      setStatus(data.instruction ?? "Approve the prompt on your phone (enter your Mobile Money PIN) to complete your deposit.");
+      await pollFlutterwaveV4Momo(data.reference);
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function depositFlutterwaveMomo() {

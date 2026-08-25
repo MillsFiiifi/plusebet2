@@ -14,11 +14,13 @@
 //
 // Amounts are MAJOR units (GH₵200 = 200). Credit ONLY on status 'succeeded'.
 
+import { randomUUID } from 'crypto'
+
 const IDP_TOKEN_URL =
   process.env.FLUTTERWAVE_V4_TOKEN_URL?.trim() ||
   'https://idp.flutterwave.com/realms/flutterwave/protocol/openid-connect/token'
 const V4_BASE =
-  process.env.FLUTTERWAVE_V4_BASE_URL?.trim() || 'https://api.flutterwave.cloud/f4b/v1'
+  process.env.FLUTTERWAVE_V4_BASE_URL?.trim() || 'https://f4bexperience.flutterwave.com'
 
 /** UI network id (mtn/vod/atl) -> V4 mobile_money network code. */
 const NETWORK: Record<string, string> = {
@@ -84,6 +86,8 @@ async function v4<T>(
   const headers: Record<string, string> = {
     Authorization: `Bearer ${token}`,
     'Content-Type': 'application/json',
+    // X-Trace-Id is REQUIRED by V4 (12–255 chars); unique per request.
+    'X-Trace-Id': `pluse-${randomUUID()}`,
   }
   // V4 supports an idempotency key on POSTs so retries don't double-charge.
   if (init.idempotencyKey) headers['X-Idempotency-Key'] = init.idempotencyKey

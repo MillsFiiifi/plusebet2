@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Shield, ArrowRight, Lock, Zap, ShieldCheck, Check, X, RotateCcw } from "lucide-react";
 import { Brand } from "@/components/brand";
-import { cn, cedis } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatMoneyWithCurrency } from "@/lib/format-money";
 
 type LegResult = "won" | "lost" | "pending";
 
@@ -14,6 +15,7 @@ type Result = {
   stake: number;
   odds: number;
   payout: number;
+  currency?: string;
   legs: { match: string; pick: string; odds: number; result: LegResult }[];
 };
 
@@ -31,6 +33,7 @@ type ApiBet = {
   totalOdds: number;
   potentialWin: number;
   payout?: number;
+  currency?: string;
   selections?: ApiSelection[];
 };
 
@@ -70,6 +73,7 @@ export default function VerifyPage() {
         stake: bet.stake,
         odds: bet.totalOdds,
         payout: bet.payout ?? bet.potentialWin,
+        currency: bet.currency,
         legs: (bet.selections ?? []).map((s) => ({
           match: [s.match?.homeTeam, s.match?.awayTeam].filter(Boolean).join(" v ") || "Match",
           pick: s.outcomeLabel || "Selection",
@@ -191,9 +195,9 @@ function ResultCard({ r, onReset }: { r: Result; onReset: () => void }) {
         </div>
 
         <div className="grid grid-cols-3 gap-2.5 mb-5">
-          <Box label="Stake" value={cedis(r.stake)} />
+          <Box label="Stake" value={formatMoneyWithCurrency(r.stake, r.currency)} />
           <Box label="Total Odds" value={`@ ${r.odds.toFixed(2)}`} />
-          <Box label="Potential" value={cedis(r.payout)} grad />
+          <Box label="Potential" value={formatMoneyWithCurrency(r.payout, r.currency)} grad />
         </div>
 
         <div className="space-y-2.5">

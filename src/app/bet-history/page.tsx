@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { BetCard } from "@/components/bet-card";
 import { useBets } from "@/lib/use-bets";
 import { useMatches } from "@/lib/use-matches";
-import { cedis } from "@/lib/utils";
+import { formatMoneyWithCurrency } from "@/lib/format-money";
 
 const TABS = ["All", "Won", "Lost", "Pending"];
 const MAP: Record<string, string> = { Won: "won", Lost: "lost", Pending: "pending" };
@@ -42,9 +42,9 @@ export default function BetHistoryPage() {
         <>
           {/* summary */}
           <div className="grid grid-cols-3 gap-3 mb-5">
-            <Summary label="Total Staked" value={cedis(bets.reduce((a, b) => a + b.stake, 0))} />
+            <Summary label="Total Staked" value={formatMoneyWithCurrency(bets.reduce((a, b) => a + b.stake, 0), bets[0]?.currency)} />
             <Summary label="Settled Won" value={`${won}/${bets.length}`} tone="emerald" />
-            <Summary label="Returns" value={cedis(bets.filter((b) => b.status === "won").reduce((a, b) => a + b.potential, 0))} tone="amber" />
+            <Summary label="Returns" value={formatMoneyWithCurrency(bets.filter((b) => b.status === "won").reduce((a, b) => a + b.potential, 0), bets[0]?.currency)} tone="amber" />
           </div>
 
           <div className="flex gap-2 overflow-x-auto no-scrollbar mb-4">

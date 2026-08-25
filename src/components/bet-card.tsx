@@ -4,7 +4,8 @@ import { useState } from "react";
 import { ChevronDown, Check, X, Clock, Banknote, Copy, Trophy, Radio } from "lucide-react";
 import type { Bet } from "@/lib/types";
 import { WinCongrats } from "./win-congrats";
-import { cn, cedis } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { formatMoneyWithCurrency } from "@/lib/format-money";
 
 const STATUS = {
   won: { label: "Won", cls: "bg-[var(--color-emerald)]/12 text-[var(--color-emerald)] border-[var(--color-emerald)]/30", icon: Check },
@@ -70,7 +71,7 @@ export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string
         <div className="flex items-center gap-3 shrink-0">
           <div className="text-right">
             <div className={cn("num text-[14px] font-bold", b.status === "won" ? "text-[var(--color-emerald)]" : b.status === "lost" ? "text-[var(--color-ink-faint)] line-through" : "grad-text")}>
-              {cedis(b.potential)}
+              {formatMoneyWithCurrency(b.potential, b.currency)}
             </div>
             <div className="num text-[10px] text-[var(--color-ink-faint)]">@ {b.totalOdds.toFixed(2)}</div>
           </div>
@@ -97,7 +98,7 @@ export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string
           })}
           <div className="flex items-center justify-between pt-2.5 border-t border-[var(--color-line)] text-[12px]">
             <span className="text-[var(--color-ink-dim)]">Stake</span>
-            <span className="num font-bold">{cedis(b.stake)}</span>
+            <span className="num font-bold">{formatMoneyWithCurrency(b.stake, b.currency)}</span>
           </div>
           <div className="flex items-center gap-2 pt-1">
             <button className="flex items-center gap-1.5 chip px-3 py-1.5"><Copy size={12} /> Copy code</button>
@@ -111,7 +112,7 @@ export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string
             )}
             {b.status === "pending" && (
               <button className="flex items-center gap-1.5 chip px-3 py-1.5 bg-[var(--color-cyan)]/12 border-[var(--color-cyan)]/30 text-[var(--color-cyan)]">
-                <Banknote size={12} /> Cash out {cedis(b.stake * b.totalOdds * 0.82)}
+                <Banknote size={12} /> Cash out {formatMoneyWithCurrency(b.stake * b.totalOdds * 0.82, b.currency)}
               </button>
             )}
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Check, X, Clock, Banknote, Copy, Trophy, Radio } from "lucide-react";
+import { ChevronDown, Check, X, Clock, Banknote, Trophy, Radio, Lock } from "lucide-react";
 import type { Bet } from "@/lib/types";
 import { WinCongrats } from "./win-congrats";
 import { cn } from "@/lib/utils";
@@ -101,7 +101,6 @@ export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string
             <span className="num font-bold">{formatMoneyWithCurrency(b.stake, b.currency)}</span>
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <button className="flex items-center gap-1.5 chip px-3 py-1.5"><Copy size={12} /> Copy code</button>
             {isWon && (
               <button
                 onClick={() => setCelebrate(true)}
@@ -111,8 +110,12 @@ export function BetCard({ b, liveMatchIds }: { b: Bet; liveMatchIds?: Set<string
               </button>
             )}
             {b.status === "pending" && (
-              <button className="flex items-center gap-1.5 chip px-3 py-1.5 bg-[var(--color-cyan)]/12 border-[var(--color-cyan)]/30 text-[var(--color-cyan)]">
-                <Banknote size={12} /> Cash out {formatMoneyWithCurrency(b.stake * b.totalOdds * 0.82, b.currency)}
+              <button
+                disabled
+                title="Cash out is currently unavailable"
+                className="flex items-center gap-1.5 chip px-3 py-1.5 opacity-60 cursor-not-allowed text-[var(--color-ink-faint)]"
+              >
+                <Lock size={12} /> Cash out locked
               </button>
             )}
           </div>

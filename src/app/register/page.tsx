@@ -8,18 +8,18 @@ import { AuthShell, Field } from "@/components/auth-shell";
 import { saveUserSession } from "@/lib/user-session";
 
 const COUNTRIES = [
-  { dial: "233", iso: "GH", flag: "🇬🇭", kyc: "Ghana Card number", kycHint: "GHA-XXXXXXXXX-X", needsKyc: true },
-  { dial: "234", iso: "NG", flag: "🇳🇬", kyc: "BVN or NIN", kycHint: "11 digits", needsKyc: true },
-  { dial: "254", iso: "KE", flag: "🇰🇪", kyc: "National ID number", kycHint: "7–8 digits", needsKyc: true },
-  { dial: "27", iso: "ZA", flag: "🇿🇦", kyc: "ID number", kycHint: "13 digits", needsKyc: true },
-  { dial: "256", iso: "UG", flag: "🇺🇬", kyc: "National ID (NIN)", kycHint: "NIN number", needsKyc: true },
-  { dial: "255", iso: "TZ", flag: "🇹🇿", kyc: "National ID", kycHint: "ID number", needsKyc: true },
-  { dial: "237", iso: "CM", flag: "🇨🇲", kyc: "National ID", kycHint: "ID number", needsKyc: true },
-  { dial: "260", iso: "ZM", flag: "🇿🇲", kyc: "National ID", kycHint: "ID number", needsKyc: true },
-  { dial: "225", iso: "CI", flag: "🇨🇮", kyc: "National ID", kycHint: "ID number", needsKyc: true },
-  { dial: "250", iso: "RW", flag: "🇷🇼", kyc: "National ID", kycHint: "ID number", needsKyc: true },
-  { dial: "1", iso: "US", flag: "🇺🇸", kyc: "SSN (last 4)", kycHint: "last 4 digits", needsKyc: true },
-  { dial: "44", iso: "GB", flag: "🇬🇧", kyc: "ID number", kycHint: "ID number", needsKyc: true },
+  { dial: "233", iso: "GH", flag: "🇬🇭", kyc: "Ghana Card number", kycHint: "GHA-XXXXXXXXX-X", needsKyc: false },
+  { dial: "234", iso: "NG", flag: "🇳🇬", kyc: "BVN or NIN", kycHint: "11 digits", needsKyc: false },
+  { dial: "254", iso: "KE", flag: "🇰🇪", kyc: "National ID number", kycHint: "7–8 digits", needsKyc: false },
+  { dial: "27", iso: "ZA", flag: "🇿🇦", kyc: "ID number", kycHint: "13 digits", needsKyc: false },
+  { dial: "256", iso: "UG", flag: "🇺🇬", kyc: "National ID (NIN)", kycHint: "NIN number", needsKyc: false },
+  { dial: "255", iso: "TZ", flag: "🇹🇿", kyc: "National ID", kycHint: "ID number", needsKyc: false },
+  { dial: "237", iso: "CM", flag: "🇨🇲", kyc: "National ID", kycHint: "ID number", needsKyc: false },
+  { dial: "260", iso: "ZM", flag: "🇿🇲", kyc: "National ID", kycHint: "ID number", needsKyc: false },
+  { dial: "225", iso: "CI", flag: "🇨🇮", kyc: "National ID", kycHint: "ID number", needsKyc: false },
+  { dial: "250", iso: "RW", flag: "🇷🇼", kyc: "National ID", kycHint: "ID number", needsKyc: false },
+  { dial: "1", iso: "US", flag: "🇺🇸", kyc: "SSN (last 4)", kycHint: "last 4 digits", needsKyc: false },
+  { dial: "44", iso: "GB", flag: "🇬🇧", kyc: "ID number", kycHint: "ID number", needsKyc: false },
 ] as const;
 
 const inputCls =

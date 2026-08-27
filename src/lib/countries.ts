@@ -62,7 +62,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currencySymbol: 'GHS',
     locale: 'en-GB',
     dialCode: '233',
-    requiresKyc: true,
+    requiresKyc: false,
     kycLabel: 'Ghana Card number',
     kycPlaceholder: 'GHA-XXXXXXXXX-X',
     kycError: 'Ghana Card number is required (format: GHA-XXXXXXXXX-X)',
@@ -87,7 +87,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currencySymbol: '₦',
     locale: 'en-NG',
     dialCode: '234',
-    requiresKyc: true,
+    requiresKyc: false,
     kycLabel: 'BVN or NIN',
     kycPlaceholder: '12345678901',
     kycError: 'BVN or NIN must be exactly 11 digits',
@@ -114,7 +114,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currencySymbol: 'KSh',
     locale: 'en-KE',
     dialCode: '254',
-    requiresKyc: true,
+    requiresKyc: false,
     kycLabel: 'National ID number',
     kycPlaceholder: '12345678',
     kycError: 'National ID must be 7 or 8 digits',
@@ -135,7 +135,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
     currencySymbol: 'R',
     locale: 'en-ZA',
     dialCode: '27',
-    requiresKyc: true,
+    requiresKyc: false,
     kycLabel: 'ID number',
     kycPlaceholder: '1234567890123',
     kycError: 'South African ID must be 13 digits',
@@ -151,7 +151,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   // ── Manual / admin-credit markets (no automated rail yet) ──────────────────
   UG: {
     code: 'UG', name: 'Uganda', flag: '🇺🇬', currency: 'UGX', currencySymbol: 'USh',
-    locale: 'en-UG', dialCode: '256', requiresKyc: true,
+    locale: 'en-UG', dialCode: '256', requiresKyc: false,
     kycLabel: 'National ID (NIN)', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 30000, verificationAmount: 30000, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -161,7 +161,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   TZ: {
     code: 'TZ', name: 'Tanzania', flag: '🇹🇿', currency: 'TZS', currencySymbol: 'TSh',
-    locale: 'en-TZ', dialCode: '255', requiresKyc: true,
+    locale: 'en-TZ', dialCode: '255', requiresKyc: false,
     kycLabel: 'National ID', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 20000, verificationAmount: 20000, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -172,7 +172,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   CM: {
     code: 'CM', name: 'Cameroon', flag: '🇨🇲', currency: 'XAF', currencySymbol: 'FCFA',
-    locale: 'fr-CM', dialCode: '237', requiresKyc: true,
+    locale: 'fr-CM', dialCode: '237', requiresKyc: false,
     kycLabel: 'National ID', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 5000, verificationAmount: 5000, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -182,7 +182,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   ZM: {
     code: 'ZM', name: 'Zambia', flag: '🇿🇲', currency: 'ZMW', currencySymbol: 'K',
-    locale: 'en-ZM', dialCode: '260', requiresKyc: true,
+    locale: 'en-ZM', dialCode: '260', requiresKyc: false,
     kycLabel: 'National ID', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 200, verificationAmount: 200, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -192,7 +192,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   CI: {
     code: 'CI', name: "Côte d'Ivoire", flag: '🇨🇮', currency: 'XOF', currencySymbol: 'CFA',
-    locale: 'fr-CI', dialCode: '225', requiresKyc: true,
+    locale: 'fr-CI', dialCode: '225', requiresKyc: false,
     kycLabel: 'National ID', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 5000, verificationAmount: 5000, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -203,7 +203,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   RW: {
     code: 'RW', name: 'Rwanda', flag: '🇷🇼', currency: 'RWF', currencySymbol: 'FRw',
-    locale: 'en-RW', dialCode: '250', requiresKyc: true,
+    locale: 'en-RW', dialCode: '250', requiresKyc: false,
     kycLabel: 'National ID', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 10000, verificationAmount: 10000, gateway: 'manual', payoutTarget: 'mobile',
     payoutNetworks: [
@@ -213,7 +213,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   US: {
     code: 'US', name: 'United States', flag: '🇺🇸', currency: 'USD', currencySymbol: '$',
-    locale: 'en-US', dialCode: '1', requiresKyc: true,
+    locale: 'en-US', dialCode: '1', requiresKyc: false,
     kycLabel: 'SSN (last 4)', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 10, verificationAmount: 10, gateway: 'manual', payoutTarget: 'bank',
     payoutNetworks: [
@@ -222,7 +222,7 @@ const COUNTRIES: Record<CountryCode, CountryConfig> = {
   },
   GB: {
     code: 'GB', name: 'United Kingdom', flag: '🇬🇧', currency: 'GBP', currencySymbol: '£',
-    locale: 'en-GB', dialCode: '44', requiresKyc: true,
+    locale: 'en-GB', dialCode: '44', requiresKyc: false,
     kycLabel: 'ID number', kycPlaceholder: 'Optional', kycError: 'Invalid ID',
     minFirstDeposit: 8, verificationAmount: 8, gateway: 'manual', payoutTarget: 'bank',
     payoutNetworks: [

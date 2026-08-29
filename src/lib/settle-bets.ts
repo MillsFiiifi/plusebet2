@@ -6,9 +6,15 @@
 //   • otherwise (a leg's match hasn't finished, or its market can't be auto-
 //     judged) → leave the bet pending for the admin / a later run
 //
-// Only the 1X2 (match-result) market is auto-judged, off the final score —
-// which is exactly what custom scripted matches use. Other markets and real
-// API-Football results are left for manual settlement.
+// Finished scores come from TWO sources, so games settle on their own with no
+// admin marking:
+//   • custom (scripted) matches — final score off their own clock/score
+//   • REAL API-Football fixtures — final score fetched from the results feed
+//
+// Markets auto-judged off the final score: 1X2 / Match Result, Double Chance,
+// Over/Under (Total Goals), Both Teams To Score, Correct Score, and Draw No Bet
+// (when not a draw). Anything the data can't decide stays pending — nothing is
+// ever guessed, because a wrong settlement moves real money.
 
 import {
   readBets,
@@ -19,12 +25,15 @@ import {
 } from '@/lib/bets-store'
 import { creditBalance } from '@/lib/users-store'
 import { readCustomMatches } from '@/lib/custom-matches-store'
+import { fetchRealResults } from '@/lib/results'
 import { liveClockLabel } from '@/lib/match-betting'
 import type { BetSelection, Match, PlacedBet } from '@/lib/domain-types'
 
 interface FinalScore {
   home: number
   away: number
+  htHome?: number | null
+  htAway?: number | null
 }
 
 /** Final score for a custom match, or null if it isn't finished yet. */
@@ -37,25 +46,97 @@ function finalResult(m: Match): FinalScore | null {
 
 type LegResult = 'won' | 'lost' | 'pending'
 
-/** Judge a single 1X2 leg against a final score; 'pending' if not judgeable. */
+/**
+ * Judge one leg against a final score. Returns 'pending' for anything it can't
+ * decide (unknown market, no result yet, a market needing data we don't have) —
+ * conservative on purpose so we never settle wrongly.
+ */
 function judgeLeg(leg: BetSelection, finished: Map<string, FinalScore>): LegResult {
   const score = finished.get(leg.matchId)
   if (!score) return 'pending'
 
-  const actual: 'home' | 'draw' | 'away' =
-    score.home > score.away ? 'home' : score.home < score.away ? 'away' : 'draw'
+  const home = score.home
+  const away = score.away
+  const total = home + away
+  const winner: 'home' | 'draw' | 'away' =
+    home > away ? 'home' : home < away ? 'away' : 'draw'
+  const bothScored = home > 0 && away > 0
 
-  // The slip stores the pick as the team name (or "Draw"); `selection` may also
-  // be set. Map it to home/draw/away.
-  const outcome = (leg.outcomeKey || leg.outcomeLabel || '').trim()
-  let pick: 'home' | 'draw' | 'away' | null = leg.selection ?? null
-  if (!pick) {
-    if (outcome === leg.match.homeTeam) pick = 'home'
-    else if (outcome === leg.match.awayTeam) pick = 'away'
-    else if (/^draw$/i.test(outcome) || outcome.toLowerCase() === 'x') pick = 'draw'
+  const market = (leg.marketLabel || leg.marketKey || '').toLowerCase().trim()
+  const outcome = (leg.outcomeLabel || leg.outcomeKey || '').trim()
+  const o = outcome.toLowerCase()
+  const homeTeam = (leg.match.homeTeam || '').trim()
+  const awayTeam = (leg.match.awayTeam || '').trim()
+
+  // ── Over / Under (Total Goals) ── labels "Over 2.5" / "Under 2.5"
+  const ou = outcome.match(/(over|under)\s+(\d+(?:\.\d+)?)/i)
+  if (market.includes('over') || market.includes('total goals') || ou) {
+    if (!ou) return 'pending'
+    const line = parseFloat(ou[2])
+    if (!Number.isFinite(line)) return 'pending'
+    // .5 lines can't push; whole lines that land exactly are a void — leave those.
+    if (Number.isInteger(line) && total === line) return 'pending'
+    return ou[1].toLowerCase() === 'over'
+      ? total > line ? 'won' : 'lost'
+      : total < line ? 'won' : 'lost'
   }
-  if (!pick) return 'pending' // unknown market (over/under, btts, …) — leave it
-  return pick === actual ? 'won' : 'lost'
+
+  // ── Both Teams To Score ── labels "Yes" / "No"
+  if (market.includes('both teams')) {
+    if (/^yes$/i.test(outcome)) return bothScored ? 'won' : 'lost'
+    if (/^no$/i.test(outcome)) return bothScored ? 'lost' : 'won'
+    return 'pending'
+  }
+
+  // ── Double Chance ── labels "{home} or Draw" / "Home or Away" / "{away} or Draw"
+  if (market.includes('double chance')) {
+    const homeOrDraw = homeTeam && o.includes(homeTeam.toLowerCase()) && o.includes('draw')
+    const awayOrDraw = awayTeam && o.includes(awayTeam.toLowerCase()) && o.includes('draw')
+    const homeOrAway = o === 'home or away'
+    if (homeOrDraw) return winner === 'home' || winner === 'draw' ? 'won' : 'lost'
+    if (awayOrDraw) return winner === 'away' || winner === 'draw' ? 'won' : 'lost'
+    if (homeOrAway) return winner === 'home' || winner === 'away' ? 'won' : 'lost'
+    return 'pending'
+  }
+
+  // ── Correct Score ── labels like "2-1"
+  if (market.includes('correct score')) {
+    const cs = outcome.match(/(\d+)\s*[-:]\s*(\d+)/)
+    if (!cs) return 'pending'
+    return Number(cs[1]) === home && Number(cs[2]) === away ? 'won' : 'lost'
+  }
+
+  // ── Draw No Bet ── labels are the team names; a draw voids (leave pending)
+  if (market.includes('draw no bet')) {
+    if (winner === 'draw') return 'pending' // stake refund is an admin/void call
+    if (homeTeam && outcome === homeTeam) return winner === 'home' ? 'won' : 'lost'
+    if (awayTeam && outcome === awayTeam) return winner === 'away' ? 'won' : 'lost'
+    return 'pending'
+  }
+
+  // ── Match Result (1X2) ── labels are the team names or "Draw" (also the
+  // default for legacy legs that carry `selection`).
+  const looks1x2 =
+    market.includes('1x2') ||
+    market.includes('match result') ||
+    leg.selection != null ||
+    outcome === homeTeam ||
+    outcome === awayTeam ||
+    /^draw$/i.test(outcome) ||
+    o === 'x'
+  if (looks1x2) {
+    let pick: 'home' | 'draw' | 'away' | null = leg.selection ?? null
+    if (!pick) {
+      if (homeTeam && outcome === homeTeam) pick = 'home'
+      else if (awayTeam && outcome === awayTeam) pick = 'away'
+      else if (/^draw$/i.test(outcome) || o === 'x') pick = 'draw'
+    }
+    if (!pick) return 'pending'
+    return pick === winner ? 'won' : 'lost'
+  }
+
+  // Half Time / Full Time, First Half, and anything else — left for the admin.
+  return 'pending'
 }
 
 export interface SettleResult {
@@ -73,19 +154,41 @@ export interface SettleResult {
 export async function settlePendingBets(userId?: string): Promise<SettleResult> {
   const result: SettleResult = { checked: 0, won: 0, lost: 0, creditedTotal: 0 }
 
-  // Build the finished-match → final-score map from custom (scripted) matches.
+  const bets: PlacedBet[] = userId ? await readBetsForUser(userId) : await readBets()
+  const pending = bets.filter((b) => b.status === 'pending')
+  if (pending.length === 0) return result
+
+  // Finished-score map from custom (scripted) matches.
   const customMatches = await readCustomMatches()
+  const customIds = new Set(customMatches.map((m) => m.id))
   const finished = new Map<string, FinalScore>()
   for (const m of customMatches) {
     const r = finalResult(m)
     if (r) finished.set(m.id, r)
   }
-  if (finished.size === 0) return result // nothing has finished — nothing to do
 
-  const bets: PlacedBet[] = userId ? await readBetsForUser(userId) : await readBets()
+  // Plus REAL API-Football fixtures: every distinct non-custom match id riding
+  // on a pending leg. This is what makes real games settle on their own.
+  const realIds = new Set<string>()
+  for (const bet of pending) {
+    for (const leg of bet.selections) {
+      if (leg.matchId && !customIds.has(leg.matchId)) realIds.add(leg.matchId)
+    }
+  }
+  if (realIds.size > 0) {
+    try {
+      const real = await fetchRealResults([...realIds])
+      for (const [id, r] of real) {
+        finished.set(id, { home: r.home, away: r.away, htHome: r.htHome, htAway: r.htAway })
+      }
+    } catch (e) {
+      console.error('[settle] fetchRealResults failed (custom still settle):', e)
+    }
+  }
 
-  for (const bet of bets) {
-    if (bet.status !== 'pending') continue
+  if (finished.size === 0) return result // nothing finished yet
+
+  for (const bet of pending) {
     result.checked++
 
     const legResults = bet.selections.map((leg) => ({ leg, res: judgeLeg(leg, finished) }))
@@ -100,10 +203,8 @@ export async function settlePendingBets(userId?: string): Promise<SettleResult> 
       const settled = await settleBetIfPending(bet.id, { status: 'won', settledAt, payout })
       if (!settled) continue // another path already settled it
 
-      // Credit the wallet BEFORE we consider the win final. If the credit
-      // fails, revert the bet to pending so the next run retries the whole
-      // thing — never leave a bet 'won' but unpaid (that was the old bug: the
-      // credit error was swallowed and the win could never be re-credited).
+      // Credit the wallet BEFORE we consider the win final. If the credit fails,
+      // revert to pending so a later run retries — never leave a bet won-unpaid.
       try {
         if (bet.userId) {
           const credited = await creditBalance(bet.userId, payout)

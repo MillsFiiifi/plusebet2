@@ -492,7 +492,7 @@ function PaymentModal({
     if (usePayseedMomo) return depositPayseedMomo();
     if (usePayseedBank) return depositPayseedBank();
     if (useMoolre) return depositMoolre();
-    if (useFlutterwaveMomo) return depositFlutterwaveV4Momo();
+    if (useFlutterwaveMomo) return depositFlutterwaveMomo();
     if (useFlutterwaveHosted) return depositFlutterwave();
     if (useKorapay) return depositKorapay();
     if (usePaystackMomo) return depositPaystackMomo();
